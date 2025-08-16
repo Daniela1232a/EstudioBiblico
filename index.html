@@ -1,0 +1,348 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Practicador Bíblico</title>
+  <!-- SheetJS para leer Excel en el navegador -->
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.19.3/dist/xlsx.full.min.js"></script>
+  <style>
+    :root{
+      --rose:#f9d1e4;     /* rosa suave */
+      --rose-2:#f7b7d3;   /* rosa un poco más intenso */
+      --green:#b6e3c1;    /* verde suave */
+      --text:#222;
+      --muted:#666;
+      --ok:#1a7f37;
+      --bad:#b42318;
+      --card:#ffffff;
+      --shadow: 0 10px 25px rgba(0,0,0,.08);
+      --radius: 16px;
+    }
+    html, body{height:100%;}
+    body{
+      margin:0; font-family: system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, Noto Sans, "Helvetica Neue", Arial, "Apple Color Emoji", "Segoe UI Emoji";
+      color:var(--text);
+      background: linear-gradient(180deg, var(--rose) 0%, var(--green) 100%);
+      display:flex; align-items:center; justify-content:center;
+    }
+    .app{ width: min(960px, 92vw); }
+    .card{
+      background:var(--card); border-radius:var(--radius); box-shadow:var(--shadow);
+      padding: clamp(16px, 3.5vw, 28px);
+    }
+    h1{ margin:0 0 6px; font-size:clamp(26px, 4.6vw, 40px); letter-spacing:.3px; }
+    .lead{ color:var(--muted); margin:0 0 20px; font-size:clamp(14px, 2.6vw, 18px); }
+
+    .btn{ 
+      display:inline-flex; align-items:center; justify-content:center; gap:.6rem;
+      padding:12px 18px; border-radius:999px; border:none; cursor:pointer; font-weight:600;
+      background:var(--text); color:white; transition: transform .06s ease, opacity .2s;
+    }
+    .btn:active{ transform: translateY(1px) scale(.99); }
+    .btn.secondary{ background:#333; }
+    .btn.rose{ background:var(--rose-2); color:#2b2b2b; }
+    .btn.ghost{ background:transparent; border:1px solid #ddd; color:#333; }
+    .btn[disabled]{ opacity:.6; cursor:not-allowed; }
+
+    .row{ display:flex; flex-wrap:wrap; gap:12px; }
+    .space{ height:12px; }
+    .hidden{ display:none !important; }
+
+    .menu{
+      display:grid; grid-template-columns: 1fr; gap:12px;
+    }
+    @media (min-width:700px){ .menu{ grid-template-columns: 1fr 1fr; } }
+
+    .pill{
+      background: #fff; border:1px solid #eee; border-radius:999px; padding:6px 12px; font-size:14px; color:#555;
+    }
+
+    .options{ display:grid; gap:10px; margin-top:12px; }
+    .option{
+      width:100%; text-align:left; padding:12px 14px; border-radius:12px; border:1px solid #eaeaea; background:#fff; cursor:pointer; font-size:16px;
+      transition: background .15s ease, border-color .15s ease;
+    }
+    .option:hover{ background:#fafafa; }
+    .option.correct{ border-color: #b7e3c5; background:#f3fff6; }
+    .option.wrong{ border-color:#f5b5b0; background:#fff5f4; }
+
+    .feedback{ margin-top:14px; padding:12px; border-radius:12px; background:#fafafa; border:1px solid #eee; }
+    .feedback .status-ok{ color:var(--ok); font-weight:700; }
+    .feedback .status-bad{ color:var(--bad); font-weight:700; }
+    .footer{ display:flex; justify-content:space-between; align-items:center; margin-top:14px; flex-wrap:wrap; gap:10px; }
+
+    .chapters{ display:grid; grid-template-columns: repeat(4, 1fr); gap:10px; }
+    @media (max-width:520px){ .chapters{ grid-template-columns: repeat(2, 1fr); } }
+    .chapter-btn{ padding:10px; border-radius:10px; border:1px solid #ddd; background:#fff; cursor:pointer; }
+    .chapter-btn:hover{ background:#fafafa; }
+
+    .topbar{ display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:12px; }
+    .tag{ font-size:13px; color:#444; background:#fff; border:1px solid #eee; border-radius:999px; padding:6px 10px; }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <!-- PANTALLA: INICIO -->
+    <section id="view-home" class="card">
+      <h1>¡Es hora de estudiar! ✨</h1>
+      <p class="lead">Bienvenida/o al practicador bíblico. Usa tu archivo <strong>data.xlsx</strong> (16 hojas: <em>capitulo 1</em> … <em>capitulo 16</em> con columnas <em>pregunta</em>, <em>respuesta</em>, <em>versiculo</em>, <em>cita</em>). 
+      Sube este archivo junto a este <em>index.html</em> en GitHub Pages y listo.</p>
+      <div class="row">
+        <button class="btn rose" id="btn-empezar">Comenzar</button>
+        <span class="pill" id="status-file">Esperando cargar: <strong>data.xlsx</strong></span>
+      </div>
+    </section>
+
+    <div class="space"></div>
+
+    <!-- PANTALLA: MENÚ -->
+    <section id="view-menu" class="card hidden">
+      <div class="topbar">
+        <h2 style="margin:0">Elige un modo</h2>
+        <span class="tag" id="tag-total">0 preguntas cargadas</span>
+      </div>
+      <div class="menu">
+        <div class="card" style="box-shadow:none; border:1px solid #eee;">
+          <h3 style="margin-top:0">Estudiar por capítulos 📖</h3>
+          <p class="lead">Selecciona un capítulo para practicar solo sus preguntas.</p>
+          <div class="chapters" id="chapters"></div>
+        </div>
+        <div class="card" style="box-shadow:none; border:1px solid #eee;">
+          <h3 style="margin-top:0">Aleatorio 🎲</h3>
+          <p class="lead">Combina preguntas de todos los capítulos.</p>
+          <button class="btn" id="btn-aleatorio">Empezar aleatorio</button>
+        </div>
+      </div>
+      <div class="space"></div>
+      <button class="btn ghost" id="btn-volver-home">← Volver al inicio</button>
+    </section>
+
+    <div class="space"></div>
+
+    <!-- PANTALLA: QUIZ -->
+    <section id="view-quiz" class="card hidden">
+      <div class="topbar">
+        <div id="quiz-context" class="tag">Modo</div>
+        <div class="tag" id="quiz-progress">0/0</div>
+      </div>
+      <h3 id="q-text">Pregunta aquí…</h3>
+      <div class="options" id="q-options"></div>
+      <div class="feedback hidden" id="q-feedback"></div>
+      <div class="footer">
+        <button class="btn ghost" id="btn-salir">← Salir</button>
+        <button class="btn" id="btn-siguiente" disabled>Siguiente →</button>
+      </div>
+    </section>
+  </div>
+
+  <script>
+    // -----------------------
+    // Utilidades
+    // -----------------------
+    const $ = (sel) => document.querySelector(sel);
+    const $$ = (sel) => Array.from(document.querySelectorAll(sel));
+
+    function shuffle(arr){
+      for(let i=arr.length-1;i>0;i--){
+        const j = Math.floor(Math.random()*(i+1));
+        [arr[i],arr[j]]=[arr[j],arr[i]];
+      }
+      return arr;
+    }
+    function normalizeKey(s){ return String(s||'').trim().toLowerCase(); }
+
+    // -----------------------
+    // Estado global
+    // -----------------------
+    const state = {
+      loaded:false,
+      all:[],           // todas las preguntas {capitulo, pregunta, respuesta, versiculo, cita}
+      byChapter:{},     // { 'capitulo 1': [..], ... }
+      mode:null,        // 'aleatorio' | 'capitulo'
+      currentList:[],   // listado de preguntas para el modo activo
+      i:0,              // índice de pregunta actual
+      current:null,     // pregunta actual
+    };
+
+    // -----------------------
+    // Cargar Excel (data.xlsx en mismo directorio)
+    // -----------------------
+    async function loadExcel(){
+      try{
+        const res = await fetch('data.xlsx');
+        if(!res.ok) throw new Error('No se encontró data.xlsx junto a index.html');
+        const ab = await res.arrayBuffer();
+        const wb = XLSX.read(ab, {type:'array'});
+
+        const all = [];
+        const byChapter = {};
+        for(const sheetName of wb.SheetNames){
+          const ws = wb.Sheets[sheetName];
+          const rows = XLSX.utils.sheet_to_json(ws, {defval:"", raw:true});
+          // Normalizar claves por fila (acepta variantes de mayúsculas/minúsculas)
+          const items = rows.map(r=>{
+            const obj = {};
+            for(const k in r){ obj[normalizeKey(k)] = r[k]; }
+            return {
+              capitulo: String(sheetName).trim(),
+              pregunta: obj['pregunta'] ?? '',
+              respuesta: obj['respuesta'] ?? '',
+              versiculo: obj['versiculo'] ?? '',
+              cita: obj['cita'] ?? ''
+            };
+          }).filter(x=> String(x.pregunta).trim()!=='' && String(x.respuesta).trim()!=='');
+
+          if(items.length){
+            all.push(...items);
+            byChapter[sheetName] = items;
+          }
+        }
+        state.all = all;
+        state.byChapter = byChapter;
+        state.loaded = true;
+        $('#status-file').innerHTML = `Archivo <strong>data.xlsx</strong> cargado: <strong>${all.length}</strong> preguntas`;
+        $('#tag-total').textContent = `${all.length} preguntas cargadas`;
+        renderChapters();
+      }catch(err){
+        console.error(err);
+        $('#status-file').innerHTML = `⚠️ ${err.message}`;
+      }
+    }
+
+    // -----------------------
+    // Render capítulos
+    // -----------------------
+    function renderChapters(){
+      const wrap = $('#chapters');
+      wrap.innerHTML = '';
+      // Ordenar por número si el nombre es "capitulo N"
+      const names = Object.keys(state.byChapter).sort((a,b)=>{
+        const na = parseInt(String(a).replace(/[^0-9]/g,'')) || 0;
+        const nb = parseInt(String(b).replace(/[^0-9]/g,'')) || 0;
+        return na-nb || a.localeCompare(b);
+      });
+      for(const name of names){
+        const btn = document.createElement('button');
+        btn.className = 'chapter-btn';
+        btn.textContent = name;
+        btn.onclick = ()=> startChapter(name);
+        wrap.appendChild(btn);
+      }
+    }
+
+    // -----------------------
+    // Lógica del quiz
+    // -----------------------
+    function startRandom(){
+      state.mode = 'aleatorio';
+      state.currentList = shuffle([...state.all]);
+      state.i = 0;
+      nextQuestion();
+      $('#quiz-context').textContent = 'Modo: Aleatorio';
+      show('quiz');
+    }
+    function startChapter(name){
+      state.mode = 'capitulo';
+      state.currentList = shuffle([...(state.byChapter[name]||[])]);
+      state.i = 0;
+      nextQuestion();
+      $('#quiz-context').textContent = `Modo: ${name}`;
+      show('quiz');
+    }
+
+    function pickOptions(correct, pool){
+      const answers = pool.map(x=>String(x.respuesta).trim());
+      const unique = [...new Set(answers.filter(a=> normalizeKey(a) !== normalizeKey(correct)))];
+      shuffle(unique);
+      const distractors = unique.slice(0,2);
+      const opts = shuffle([String(correct).trim(), ...distractors]);
+      return opts;
+    }
+
+    function nextQuestion(){
+      const list = state.currentList;
+      if(state.i >= list.length){
+        // fin del set
+        $('#q-text').textContent = '¡Has terminado este modo! 🎉';
+        $('#q-options').innerHTML = '';
+        $('#q-feedback').classList.add('hidden');
+        $('#btn-siguiente').disabled = true;
+        $('#quiz-progress').textContent = `${list.length}/${list.length}`;
+        return;
+      }
+      const q = list[state.i];
+      state.current = q;
+
+      $('#q-text').textContent = q.pregunta;
+      $('#q-feedback').classList.add('hidden');
+      $('#q-feedback').innerHTML = '';
+      $('#btn-siguiente').disabled = true;
+
+      // opciones
+      const opts = pickOptions(q.respuesta, state.mode==='aleatorio' ? state.all : state.currentList);
+      const box = $('#q-options');
+      box.innerHTML = '';
+      for(const text of opts){
+        const b = document.createElement('button');
+        b.className = 'option';
+        b.textContent = text;
+        b.onclick = ()=> selectOption(b, text, q);
+        box.appendChild(b);
+      }
+
+      $('#quiz-progress').textContent = `${state.i+1}/${list.length}`;
+    }
+
+    function selectOption(btn, text, q){
+      // bloquear más clics
+      $$('#q-options .option').forEach(el=> el.disabled = true);
+
+      const ok = normalizeKey(text) === normalizeKey(q.respuesta);
+      btn.classList.add(ok ? 'correct' : 'wrong');
+
+      // resaltar la correcta
+      $$('#q-options .option').forEach(el=>{
+        if(normalizeKey(el.textContent) === normalizeKey(q.respuesta)){
+          el.classList.add('correct');
+        }
+      });
+
+      const fb = $('#q-feedback');
+      fb.classList.remove('hidden');
+      fb.innerHTML = `
+        <div>${ ok ? '<span class="status-ok">¡Correcto!</span> 🙌' : `<span class="status-bad">Incorrecto</span> 😅` }</div>
+        <div style="margin-top:6px"><strong>Versículo:</strong> ${escapeHtml(q.versiculo||'')}</div>
+        <div style="margin-top:6px"><strong>Cita:</strong> ${escapeHtml(q.cita||'')}</div>
+      `;
+
+      $('#btn-siguiente').disabled = false;
+    }
+
+    function escapeHtml(s){
+      return String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+    }
+
+    // -----------------------
+    // Navegación de vistas
+    // -----------------------
+    function show(view){
+      $('#view-home').classList.toggle('hidden', view!=='home');
+      $('#view-menu').classList.toggle('hidden', view!=='menu');
+      $('#view-quiz').classList.toggle('hidden', view!=='quiz');
+    }
+
+    // -----------------------
+    // Eventos UI
+    // -----------------------
+    $('#btn-empezar').addEventListener('click', ()=> show('menu'));
+    $('#btn-volver-home').addEventListener('click', ()=> show('home'));
+    $('#btn-aleatorio').addEventListener('click', startRandom);
+    $('#btn-salir').addEventListener('click', ()=> show('menu'));
+    $('#btn-siguiente').addEventListener('click', ()=>{ state.i++; nextQuestion(); window.scrollTo({top:0, behavior:'smooth'}); });
+
+    // Inicializar
+    loadExcel();
+  </script>
+</body>
+</html>
