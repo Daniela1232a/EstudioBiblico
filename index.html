@@ -206,8 +206,6 @@
         state.all = all;
         state.byChapter = byChapter;
         state.loaded = true;
-        $('#status-file').innerHTML = `Archivo <strong>data.xlsx</strong> cargado: <strong>${all.length}</strong> preguntas`;
-        $('#tag-total').textContent = `${all.length} preguntas cargadas`;
         renderChapters();
       }catch(err){
         console.error(err);
