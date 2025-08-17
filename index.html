@@ -119,22 +119,25 @@
     <div class="space"></div>
 
     <!-- PANTALLA: QUIZ -->
-    <section id="view-quiz" class="card hidden">
-      <div class="topbar">
-        <div id="quiz-context" class="tag">Modo</div>
-        <div class="tag" id="quiz-progress">0/0</div>
+      <section id="view-quiz" class="card hidden">
+        <div class="topbar">
+          <div id="quiz-context" class="tag">Modo</div>
+          <div class="tag" id="quiz-progress">0/0</div>
+        </div>
+      
+        <!-- Aquí va el chapter label (solo uno) -->
         <div id="chapter-label" 
              style="position:fixed; top:10px; right:20px; background:#eee; padding:6px 12px; border-radius:8px; font-weight:bold; box-shadow:0 2px 4px rgba(0,0,0,0.2);">
         </div>
-      </div>
-      <h3 id="q-text">Pregunta aquí…</h3>
-      <div class="options" id="q-options"></div>
-      <div class="feedback hidden" id="q-feedback"></div>
-      <div class="footer">
-        <button class="btn ghost" id="btn-salir">← Salir</button>
-        <button class="btn" id="btn-siguiente" disabled>Siguiente →</button>
-      </div>
-    </section>
+      
+        <h3 id="q-text">Pregunta aquí…</h3>
+        <div class="options" id="q-options"></div>
+        <div class="feedback hidden" id="q-feedback"></div>
+        <div class="footer">
+          <button class="btn ghost" id="btn-salir">← Salir</button>
+          <button class="btn" id="btn-siguiente" disabled>Siguiente →</button>
+        </div>
+      </section>
   </div>
 
   <script>
